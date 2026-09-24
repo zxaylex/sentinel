@@ -1,8 +1,7 @@
-"""Shared test fixtures."""
+
 import os
 from collections.abc import AsyncGenerator
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
@@ -17,7 +16,7 @@ from app.main import app
 # Use DATABASE_URL from environment (CI provides Postgres), fall back for local dev
 TEST_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql+[REDACTED_CONN_STRING]://localhost:5432/sentinel_test",
+    "postgresql+asyncpg://sentinel:sentinelpassword@localhost:5432/sentinel_test",
 )
 
 engine_test = create_async_engine(TEST_DATABASE_URL, echo=False)
@@ -43,14 +42,19 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest_asyncio.fixture
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """Provide an async test client with DB overrides."""
-    async def override_get_db():
-        yield db_session
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    """Provide an async test client with a fresh DB session per request."""
+
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with async_session_test() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
     app.dependency_overrides[get_db] = override_get_db
-
-    # Mock Redis as None (rate limiting will be skipped)
     app.state.redis = None
 
     async with AsyncClient(
@@ -64,9 +68,8 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 @pytest_asyncio.fixture
 async def seeded_db(db_session: AsyncSession):
     """Seed the test DB with default roles and permissions."""
-    from app.models.role import Role, Permission
+    from app.models.role import Permission, Role
 
-    # Create permissions
     perms = {}
     for name in ["users:read", "users:write", "roles:read", "roles:manage"]:
         p = Permission(name=name, description=f"Test permission: {name}")
@@ -74,7 +77,6 @@ async def seeded_db(db_session: AsyncSession):
         perms[name] = p
     await db_session.flush()
 
-    # Create roles
     user_role = Role(name="user", description="Default role")
     user_role.permissions = []
     db_session.add(user_role)
@@ -92,13 +94,37 @@ async def seeded_db(db_session: AsyncSession):
 
 
 @pytest_asyncio.fixture
-async def auth_headers(client: AsyncClient, seeded_db) -> dict[str, str]:
+async def seeded_client(seeded_db) -> AsyncGenerator[AsyncClient, None]:
+    """Client with seeded DB � use this when tests need roles/permissions."""
+
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with async_session_test() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.state.redis = None
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as c:
+        yield c
+
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def auth_headers(seeded_client: AsyncClient) -> dict[str, str]:
     """Register a test user and return auth headers."""
-    await client.post(
+    await seeded_client.post(
         "/api/v1/auth/register",
         json={"email": "test@example.com", "password": "testpassword123"},
     )
-    resp = await client.post(
+    resp = await seeded_client.post(
         "/api/v1/auth/login",
         json={"email": "test@example.com", "password": "testpassword123"},
     )
