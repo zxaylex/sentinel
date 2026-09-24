@@ -1,22 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.core.exceptions import ConflictException, NotFoundException
+from app.core.rbac import require_permissions
 from app.database import get_db
-from app.models.role import Role, Permission
+from app.middleware.auth_middleware import get_current_user_id
+from app.models.role import Permission, Role
 from app.models.user import User
 from app.schemas.role import (
-    RoleCreate,
-    RoleUpdate,
-    RoleResponse,
     PermissionResponse,
-    AssignRolesRequest,
+    RoleCreate,
+    RoleResponse,
+    RoleUpdate,
 )
-from app.core.rbac import require_permissions
-from app.core.exceptions import ConflictException, NotFoundException
-from app.middleware.auth_middleware import get_current_user_id
 
 router = APIRouter(prefix="/roles", tags=["RBAC"])
 
@@ -46,9 +46,7 @@ async def create_role(
     role = Role(name=body.name, description=body.description)
 
     if body.permission_ids:
-        result = await db.execute(
-            select(Permission).where(Permission.id.in_(body.permission_ids))
-        )
+        result = await db.execute(select(Permission).where(Permission.id.in_(body.permission_ids)))
         role.permissions = list(result.scalars().all())
 
     db.add(role)

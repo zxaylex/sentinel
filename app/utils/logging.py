@@ -2,8 +2,11 @@
 Structured logging configuration using structlog.
 Supports JSON output (production) and pretty-printed output (development).
 """
+
 import logging
+
 import structlog
+
 from app.config import get_settings
 
 settings = get_settings()

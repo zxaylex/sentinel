@@ -4,12 +4,12 @@ import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import get_settings
 from app.api.router import api_router
-from app.utils.health import router as health_router
-from app.utils.logging import setup_logging
+from app.config import get_settings
 from app.middleware.logging_mw import LoggingMiddleware
 from app.middleware.rate_limit_mw import RateLimitMiddleware
+from app.utils.health import router as health_router
+from app.utils.logging import setup_logging
 
 settings = get_settings()
 

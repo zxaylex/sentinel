@@ -1,6 +1,7 @@
-
 import time
+
 import redis.asyncio as redis
+
 from app.config import get_settings
 
 settings = get_settings()
@@ -18,7 +19,9 @@ class SlidingWindowRateLimiter:
     def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
 
-    async def check(self, key: str, max_requests: int, window_seconds: int = 60) -> tuple[bool, dict]:
+    async def check(
+        self, key: str, max_requests: int, window_seconds: int = 60
+    ) -> tuple[bool, dict]:
         """
         Check if a request is allowed under the rate limit.
 
@@ -44,7 +47,9 @@ class SlidingWindowRateLimiter:
         info = {
             "limit": max_requests,
             "remaining": max(0, max_requests - request_count),
-            "retry_after": int(window_seconds - (now - window_start)) if request_count > max_requests else 0,
+            "retry_after": int(window_seconds - (now - window_start))
+            if request_count > max_requests
+            else 0,
         }
 
         return request_count <= max_requests, info

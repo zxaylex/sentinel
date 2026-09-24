@@ -2,7 +2,7 @@
 Gateway route configuration loader and matcher.
 Reads gateway.yml and matches incoming requests to upstream services.
 """
-from __future__ import annotations
+
 
 import fnmatch
 from dataclasses import dataclass, field

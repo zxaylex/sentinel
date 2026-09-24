@@ -1,30 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from app.database import get_db
-from app.models.user import User
-from app.models.role import Role
-from app.models.refresh_token import RefreshToken
-from app.schemas.auth import (
-    RegisterRequest,
-    LoginRequest,
-    TokenResponse,
-    RefreshRequest,
-    UserResponse,
-)
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.config import get_settings
+from app.core.exceptions import ConflictException, CredentialsException
 from app.core.security import (
-    hash_password,
-    verify_password,
     create_access_token,
     create_refresh_token,
+    hash_password,
     hash_token,
+    verify_password,
 )
-from app.core.exceptions import ConflictException, CredentialsException, NotFoundException
-from app.config import get_settings
+from app.database import get_db
 from app.middleware.auth_middleware import get_current_user_id
+from app.models.refresh_token import RefreshToken
+from app.models.role import Role
+from app.models.user import User
+from app.schemas.auth import (
+    LoginRequest,
+    RefreshRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 settings = get_settings()
@@ -79,7 +80,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         RefreshToken(
             user_id=user.id,
             token_hash=hash_token(refresh_token),
-            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            expires_at=datetime.now(UTC)
+            + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         )
     )
 
@@ -93,8 +95,8 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(RefreshToken).where(
             RefreshToken.token_hash == token_hash,
-            RefreshToken.revoked == False,
-            RefreshToken.expires_at > datetime.now(timezone.utc),
+            RefreshToken.revoked.is_(False),
+            RefreshToken.expires_at > datetime.now(UTC),
         )
     )
     stored_token = result.scalar_one_or_none()
@@ -119,7 +121,8 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
         RefreshToken(
             user_id=user.id,
             token_hash=hash_token(new_refresh),
-            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            expires_at=datetime.now(UTC)
+            + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         )
     )
 
@@ -135,9 +138,7 @@ async def logout(
 ):
     """Revoke a refresh token. Optionally blacklists the access token via Redis."""
     token_hash = hash_token(body.refresh_token)
-    result = await db.execute(
-        select(RefreshToken).where(RefreshToken.token_hash == token_hash)
-    )
+    result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
     stored_token = result.scalar_one_or_none()
     if stored_token:
         stored_token.revoked = True

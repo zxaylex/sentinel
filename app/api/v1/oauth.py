@@ -1,18 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
-from authlib.integrations.starlette_client import OAuth
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from app.database import get_db
-from app.models.user import User
-from app.models.role import Role
-from app.models.refresh_token import RefreshToken
-from app.schemas.auth import TokenResponse
-from app.core.security import create_access_token, create_refresh_token, hash_token
+from authlib.integrations.starlette_client import OAuth
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.config import get_settings
+from app.core.security import create_access_token, create_refresh_token, hash_token
+from app.database import get_db
+from app.models.refresh_token import RefreshToken
+from app.models.role import Role
+from app.models.user import User
+from app.schemas.auth import TokenResponse
 
 router = APIRouter(prefix="/oauth", tags=["OAuth"])
 settings = get_settings()
@@ -75,7 +75,8 @@ async def _issue_tokens(user: User, db: AsyncSession) -> TokenResponse:
         RefreshToken(
             user_id=user.id,
             token_hash=hash_token(refresh_token),
-            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            expires_at=datetime.now(UTC)
+            + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         )
     )
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)

@@ -1,12 +1,12 @@
 from fastapi import Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models.user import User
-from app.models.role import Role, Permission
 from app.middleware.auth_middleware import get_current_user_id
+from app.models.role import Role
+from app.models.user import User
 
 
 class RequirePermissions:
@@ -14,7 +14,8 @@ class RequirePermissions:
     FastAPI dependency that checks if the current user has ALL required permissions.
 
     Usage:
-        @router.get("/admin", dependencies=[Depends(RequirePermissions("users:read", "users:write"))])
+        @router.get("/admin", dependencies=[
+            Depends(RequirePermissions("users:read", "users:write"))])
         async def admin_endpoint():
             ...
     """

@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta, timezone
-from uuid import UUID
 import hashlib
 import secrets
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 from passlib.context import CryptContext
+
 from app.config import get_settings
 
 settings = get_settings()
@@ -20,7 +21,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(user_id: UUID, roles: list[str]) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(user_id),
         "roles": roles,
@@ -43,9 +44,7 @@ def hash_token(token: str) -> str:
 def decode_access_token(token: str) -> dict:
     """Decode and validate an access token. Raises JWTError on failure."""
     try:
-        payload = jwt.decode(
-            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         if payload.get("type") != "access":
             raise JWTError("Invalid token type")
         return payload

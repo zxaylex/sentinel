@@ -1,17 +1,18 @@
 """Alembic environment configuration for async SQLAlchemy."""
+
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from alembic import context
 from app.config import get_settings
 from app.database import Base
+from app.models.refresh_token import RefreshToken  # noqa: F401
+from app.models.role import Permission, Role  # noqa: F401
 
 # Import all models so they register with Base.metadata
 from app.models.user import User  # noqa: F401
-from app.models.role import Role, Permission  # noqa: F401
-from app.models.refresh_token import RefreshToken  # noqa: F401
 
 config = context.config
 settings = get_settings()

@@ -2,12 +2,13 @@
 Seed the database with default roles and permissions.
 Run with: uv run python -m app.seeds.run
 """
+
 import asyncio
+
 from sqlalchemy import select
-from app.database import async_session, engine, Base
-from app.models.role import Role, Permission, role_permissions
-from app.models.user import User
-from app.models.refresh_token import RefreshToken
+
+from app.database import Base, async_session, engine
+from app.models.role import Permission, Role
 
 # Default permissions
 DEFAULT_PERMISSIONS = [
@@ -30,10 +31,14 @@ DEFAULT_ROLES = {
     "admin": {
         "description": "Administrative access",
         "permissions": [
-            "users:read", "users:write",
-            "roles:read", "roles:manage",
-            "orders:read", "orders:write",
-            "products:read", "products:write",
+            "users:read",
+            "users:write",
+            "roles:read",
+            "roles:manage",
+            "orders:read",
+            "orders:write",
+            "products:read",
+            "products:write",
         ],
     },
     "moderator": {
@@ -56,9 +61,7 @@ async def seed():
         # Seed permissions
         perm_map: dict[str, Permission] = {}
         for name, description in DEFAULT_PERMISSIONS:
-            result = await session.execute(
-                select(Permission).where(Permission.name == name)
-            )
+            result = await session.execute(select(Permission).where(Permission.name == name))
             perm = result.scalar_one_or_none()
             if not perm:
                 perm = Permission(name=name, description=description)
@@ -71,16 +74,16 @@ async def seed():
 
         # Seed roles
         for role_name, role_data in DEFAULT_ROLES.items():
-            result = await session.execute(
-                select(Role).where(Role.name == role_name)
-            )
+            result = await session.execute(select(Role).where(Role.name == role_name))
             role = result.scalar_one_or_none()
             if not role:
                 role = Role(name=role_name, description=role_data["description"])
                 role.permissions = [perm_map[p] for p in role_data["permissions"]]
                 session.add(role)
                 await session.flush()
-                print(f"  ✅ Created role: {role_name} ({len(role_data['permissions'])} permissions)")
+                print(
+                    f"  ✅ Created role: {role_name} ({len(role_data['permissions'])} permissions)"
+                )
             else:
                 print(f"  ⏭️  Role exists: {role_name}")
 
