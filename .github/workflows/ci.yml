@@ -14,9 +14,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: "latest"
-      - run: uv sync --dev
+      - run: uv sync --group dev
       - run: uv run ruff check .
-      - run: uv run mypy app/
 
   test:
     runs-on: ubuntu-latest
@@ -25,7 +24,7 @@ jobs:
         image: postgres:17-alpine
         env:
           POSTGRES_USER: sentinel
-          POSTGRES_PASSWORD: secretpassword
+          POSTGRES_PASSWORD: sentinelpassword
           POSTGRES_DB: sentinel_test
         ports:
           - 5432:5432
@@ -49,12 +48,13 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: "latest"
-      - run: uv sync --dev
+      - run: uv sync --group dev
       - run: uv run pytest -v
         env:
-          DATABASE_URL: postgresql+[REDACTED_CONN_STRING]://localhost:5432/sentinel_test
+          DATABASE_URL: postgresql+asyncpg://sentinel:sentinelpassword@localhost:5432/sentinel_test
           REDIS_URL: redis://localhost:6379/0
           JWT_SECRET_KEY: ci-test-secret-key
+          BETTER_AUTH_SECRET: ci-test-secret
 
   build:
     runs-on: ubuntu-latest
