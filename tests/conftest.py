@@ -1,7 +1,8 @@
-
+"""Shared test fixtures."""
 import os
 from collections.abc import AsyncGenerator
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
@@ -13,40 +14,41 @@ from sqlalchemy.ext.asyncio import (
 from app.database import Base, get_db
 from app.main import app
 
-# Use DATABASE_URL from environment (CI provides Postgres), fall back for local dev
 TEST_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql+asyncpg://sentinel:sentinelpassword@localhost:5432/sentinel_test",
-)
-
-engine_test = create_async_engine(TEST_DATABASE_URL, echo=False)
-async_session_test = async_sessionmaker(
-    engine_test, class_=AsyncSession, expire_on_commit=False
+    "postgresql+[REDACTED_CONN_STRING]://localhost:5432/sentinel_test",
 )
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def setup_database():
-    """Create tables before each test and drop after."""
-    async with engine_test.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine_test.begin() as conn:
+@pytest_asyncio.fixture
+async def engine():
+    """Create a fresh engine per test to avoid cross-loop issues."""
+    eng = create_async_engine(TEST_DATABASE_URL, echo=False, pool_size=5, max_overflow=0)
+
+    # Create all tables
+    async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+
+    yield eng
+
+    # Drop all tables + dispose
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await eng.dispose()
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session_test() as session:
-        yield session
+async def session_factory(engine):
+    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 @pytest_asyncio.fixture
-async def client() -> AsyncGenerator[AsyncClient, None]:
-    """Provide an async test client with a fresh DB session per request."""
+async def client(engine, session_factory) -> AsyncGenerator[AsyncClient, None]:
+    """Test client with fresh DB session per request."""
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        async with async_session_test() as session:
+        async with session_factory() as session:
             try:
                 yield session
                 await session.commit()
@@ -66,39 +68,36 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest_asyncio.fixture
-async def seeded_db(db_session: AsyncSession):
-    """Seed the test DB with default roles and permissions."""
-    from app.models.role import Permission, Role
+async def seeded_client(engine, session_factory) -> AsyncGenerator[AsyncClient, None]:
+    """Client with seeded roles and permissions."""
+    from app.models.role import Role, Permission
 
-    perms = {}
-    for name in ["users:read", "users:write", "roles:read", "roles:manage"]:
-        p = Permission(name=name, description=f"Test permission: {name}")
-        db_session.add(p)
-        perms[name] = p
-    await db_session.flush()
+    # Seed data
+    async with session_factory() as session:
+        perms = {}
+        for name in ["users:read", "users:write", "roles:read", "roles:manage"]:
+            p = Permission(name=name, description=f"Test permission: {name}")
+            session.add(p)
+            perms[name] = p
+        await session.flush()
 
-    user_role = Role(name="user", description="Default role")
-    user_role.permissions = []
-    db_session.add(user_role)
+        user_role = Role(name="user", description="Default role")
+        user_role.permissions = []
+        session.add(user_role)
 
-    admin_role = Role(name="admin", description="Admin role")
-    admin_role.permissions = list(perms.values())
-    db_session.add(admin_role)
+        admin_role = Role(name="admin", description="Admin role")
+        admin_role.permissions = list(perms.values())
+        session.add(admin_role)
 
-    superadmin_role = Role(name="superadmin", description="Superadmin role")
-    superadmin_role.permissions = list(perms.values())
-    db_session.add(superadmin_role)
+        superadmin_role = Role(name="superadmin", description="Superadmin role")
+        superadmin_role.permissions = list(perms.values())
+        session.add(superadmin_role)
 
-    await db_session.commit()
-    return {"roles": {"user": user_role, "admin": admin_role}, "permissions": perms}
+        await session.commit()
 
-
-@pytest_asyncio.fixture
-async def seeded_client(seeded_db) -> AsyncGenerator[AsyncClient, None]:
-    """Client with seeded DB � use this when tests need roles/permissions."""
-
+    # Now create the client
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        async with async_session_test() as session:
+        async with session_factory() as session:
             try:
                 yield session
                 await session.commit()
