@@ -19,7 +19,7 @@ settings = get_settings()
 
 oauth = OAuth()
 
-# ─── Register providers ──────────────────────────────────
+# Register providers
 
 if settings.GOOGLE_CLIENT_ID:
     oauth.register(
@@ -99,7 +99,6 @@ async def oauth_callback(
     client = _get_provider(provider)
     token = await client.authorize_access_token(request)
 
-    # Extract user info (provider-specific)
     email: str | None = None
     oauth_id: str | None = None
 
@@ -128,7 +127,6 @@ async def oauth_callback(
     if not email:
         raise HTTPException(status_code=400, detail="Could not retrieve email from provider")
 
-    # Find or create user
     result = await db.execute(
         select(User).where(User.email == email).options(selectinload(User.roles))
     )
@@ -139,21 +137,18 @@ async def oauth_callback(
         db.add(user)
         await db.flush()
 
-        # Assign default role
         default_role_result = await db.execute(select(Role).where(Role.name == "user"))
         default_role = default_role_result.scalar_one_or_none()
         if default_role:
             user.roles.append(default_role)
             await db.flush()
 
-        # Re-fetch with roles loaded
         result = await db.execute(
             select(User).where(User.id == user.id).options(selectinload(User.roles))
         )
         user = result.scalar_one()
 
     elif not user.oauth_provider:
-        # Link OAuth to existing email-registered account
         user.oauth_provider = provider
         user.oauth_id = oauth_id
 

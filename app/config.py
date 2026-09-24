@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
+
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "Sentinel"
@@ -9,7 +10,7 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sentinel"
+    DATABASE_URL: str = "postgresql+asyncpg://sentinel:sentinelpass@localhost:5432/sentinel"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -20,19 +21,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # OAuth2 — Google
+    # OAuth2
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-
-    # OAuth2 — GitHub
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
-
-    # OAuth2 — Discord
     DISCORD_CLIENT_ID: str = ""
     DISCORD_CLIENT_SECRET: str = ""
-
-    # OAuth2 — General
     OAUTH_REDIRECT_BASE_URL: str = "http://localhost:8000"
 
     # Rate Limiting
@@ -55,6 +50,7 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         """Parse comma-separated CORS_ORIGINS into a list."""
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:

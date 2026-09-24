@@ -4,23 +4,6 @@
 
 Sentinel is a standalone microservice that centralizes authentication, authorization, and rate limiting — so your downstream services don't have to. Deploy it in front of any number of backend APIs, and they receive authenticated requests with user context injected via headers.
 
-```
-                            ┌─────────────┐
-  Clients / Frontends ────► │  Sentinel   │
-                            │  :8000      │
-                            └──────┬──────┘
-                                   │
-                   Authenticates ─ Checks Permissions ─ Rate Limits
-                   Injects X-User-Id / X-User-Email / X-User-Roles
-                                   │
-                    ┌──────────────┼──────────────┐
-                    ▼              ▼              ▼
-              ┌──────────┐  ┌──────────┐  ┌──────────┐
-              │ Service A │  │ Service B │  │ Service C │
-              │ :3001     │  │ :3002     │  │ :3003     │
-              └──────────┘  └──────────┘  └──────────┘
-```
-
 ---
 
 ## Features
@@ -56,7 +39,7 @@ Sentinel is a standalone microservice that centralizes authentication, authoriza
 
 ```bash
 # Clone
-git clone https://github.com/yourusername/sentinel.git
+git clone https://github.com/zxaylex/sentinel.git
 cd sentinel
 
 # Install dependencies
