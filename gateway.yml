@@ -1,0 +1,22 @@
+# Sentinel Gateway Route Configuration
+# Each route defines a path pattern, upstream URL, auth requirements, and rate limits.
+
+routes:
+  - path: "/api/orders/**"
+    upstream: "http://orders-service:8000"
+    require_auth: true
+    permissions:
+      - "orders:read"
+    rate_limit: 50  # requests/min
+
+  - path: "/api/products/**"
+    upstream: "http://products-service:8000"
+    require_auth: true
+    permissions:
+      - "products:read"
+    rate_limit: 100
+
+  - path: "/api/public/**"
+    upstream: "http://public-service:8000"
+    require_auth: false
+    rate_limit: 200
