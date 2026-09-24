@@ -1,5 +1,5 @@
 """Shared test fixtures."""
-import asyncio
+import os
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -14,9 +14,11 @@ from sqlalchemy.ext.asyncio import (
 from app.database import Base, get_db
 from app.main import app
 
-# Use an in-memory SQLite for tests, or a separate test DB
-# For async postgres: postgresql+[REDACTED_CONN_STRING]://localhost:5432/sentinel_test
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+# Use DATABASE_URL from environment (CI provides Postgres), fall back for local dev
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+[REDACTED_CONN_STRING]://localhost:5432/sentinel_test",
+)
 
 engine_test = create_async_engine(TEST_DATABASE_URL, echo=False)
 async_session_test = async_sessionmaker(
@@ -35,13 +37,13 @@ async def setup_database():
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncGenerator[AsyncSession]:
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_test() as session:
         yield session
 
 
 @pytest_asyncio.fixture
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient]:
+async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Provide an async test client with DB overrides."""
     async def override_get_db():
         yield db_session
